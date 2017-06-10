@@ -1,46 +1,46 @@
-var express = require('express');
-var path = require('path');
-var app = express();
-var mongo = require('mongodb').MongoClient;
-var ObjectID = require('mongodb').ObjectID;
+const express = require('express'),
+    exphbs = require('express-handlebars'),
+    path = require('path'),
+    app = express(),
+    mongo = require('mongodb').MongoClient,
+    ObjectID = require('mongodb').ObjectID;
 
-// app.use('/public', express.static(__dirname + '/public'));
-app.use(express.static(path.join(__dirname, 'views')));
+
+var mongodbUrl = "mongodb://hussein:123456@ds119772.mlab.com:19772/heroku_sxhx0zb7";
+var locurl = 'https://shortener-fcc.herokuapp.com/';
+
+
+var hbs = exphbs.create({});
+app.engine('handlebars', hbs.engine);
+app.set('view engine', 'handlebars');
 
 app.get('/', function(req, res){
-  res.sendFile('/views/index.html');
+    res.render('home', {url: locurl});
 });
 
 app.get("/new/:proto//:url.:com", function(req, res) {
-  
-  mongo.connect("mongodb://" + process.env.IP + ":27017/data1", function(err, db) {
-      // db gives access to the database
-      if (err) return err;
-      var coll = db.collection('coll1');
-      var url = req.params.proto+"//"+req.params.url+"."+req.params.com;
-      var id = Math.round(Math.random()*9999);
-      console.log(id);
-      coll.insert({
-        url: url,
-        _id : id
-      }, function(err, data) {
-        // handle error
-        if (err) return err;
-        // other operations
-        console.log(data);
-        db.close()
-        var obj = {
-                "original_url":url,
-                "short_url":"https://freecodecamp-husseinraoouf.c9users.io/" + data.insertedIds[0]
-        };
-        // res.writeHead(200, { 'content-type': 'text/plain' });
-        res.json(obj);
-      });
-      
-      
-  })
 
-  
+  mongo.connect(mongodbUrl, function(err, db) {
+      if (err) return err;
+      var coll = db.collection('urls');
+      var url = req.params.proto+"//"+req.params.url+"."+req.params.com;
+      coll.find().sort({_id:-1}).limit(1).toArray(function(er, results) {
+          var id = 1;
+          if (results.length) {
+              id = results[0]._id + 1;
+          }
+          coll.insert({ _id : id, url: url  }, function(err, data) {
+            db.close()
+            var obj = {
+                    "original_url":url,
+                    "short_url":locurl +  + data.insertedIds[0]
+            };
+            res.json(obj);
+          });
+      });
+  });
+
+
 });
 
 app.get("/new/*",function(req, res) {
@@ -49,33 +49,22 @@ app.get("/new/*",function(req, res) {
 
 
 app.get("/:id", function(req, res) {
-  mongo.connect("mongodb://" + process.env.IP + ":27017/data1", function(err, db) {
-      // db gives access to the database
-      if (err) return err;
-      var coll = db.collection('coll1');
-      coll.findOne({
-        _id : parseInt(req.params.id)
-      }, function(err, data){
+    mongo.connect(mongodbUrl, function(err, db) {
         if (err) return err;
-        
-        console.log(req.params.id)
-        console.log(data)
-        db.close()
-        // res.writeHead(200, { 'content-type': 'text/plain' });
-        // res.end("asd");
-        res.redirect(data.url);
-      })
-      
-  });
-  
+        var coll = db.collection('urls');
+        coll.findOne({ _id : parseInt(req.params.id) }, function(err, data){
+            db.close()
+            res.redirect(data.url);
+        })
+
+    });
 });
 
 
 
 
-var port = 8080;
+var port = process.argv[2];
+
 app.listen(port, function() {
   console.log('server listening on port ' + port);
-  console.log('https://freecodecamp-husseinraoouf.c9users.io');
 });
-
